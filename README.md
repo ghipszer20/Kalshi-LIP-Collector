@@ -28,6 +28,26 @@ skips markets where nothing traded); no rate-limit responses so far. The Phase 1
 7 days and 100 markets) has not been reached, and Phase 2 (the simulator) has not been started.
 `report.py` output is an upper bound, not a profit estimate.
 
+## Historical data: what exists (checked 2026-09-24)
+
+- **Kalshi API:** `/historical/markets` and `/historical/trades` work unauthenticated (verified
+  live; `/historical/cutoff` reports the live/historical boundary at 2026-07-25). Candlesticks
+  carry bid/ask OHLC without sizes. Third-party guides say there is no historical order-book
+  depth endpoint; I did not find one, but did not confirm that against Kalshi's own docs.
+- **Past incentive programs:** `GET /incentive_programs?status=paid_out` returns ended programs
+  with their parameters (40,000+ back to at least 2026-09-11 in a capped pull). Unknown status
+  values are silently ignored and behave like `all`.
+- **Third party:** the PMXT Archive (archive.pmxt.dev) advertises free tick-level historical
+  order books for Kalshi as Parquet files, and pmxt's docs say its API serves historical Kalshi
+  books too. The archive host refused connections from this machine on 2026-09-24, so coverage,
+  dates and whether it includes the LIP-era markets are **unverified**. Commercial vendors also
+  exist (Lychee, Convex Lake, Predexon, DepthFeed); not evaluated.
+- **GitHub:** only small collectors like this one; no ready-made archive found.
+
+Implication: historical trades plus past programs can already support the adverse-selection half
+of a simulation. The reward-share half needs book depth, which for now comes only from this
+collector (or a verified archive).
+
 ## What was verified against the live API (2026-09-24)
 
 - **6,276** live liquidity programs across 539 series, not the ~480 the original handoff

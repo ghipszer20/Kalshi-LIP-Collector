@@ -34,6 +34,7 @@ import hashlib
 import json
 import logging
 import sqlite3
+import sys
 import time
 from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
@@ -462,10 +463,18 @@ def main() -> None:
     fmt = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
     fh = RotatingFileHandler(DATA / "collector.log", maxBytes=5_000_000, backupCount=3, encoding="utf-8")
     fh.setFormatter(fmt)
-    sh = logging.StreamHandler()
-    sh.setFormatter(fmt)
-    logging.basicConfig(level=logging.INFO, handlers=[fh, sh])
-    asyncio.run(run(args))
+    handlers = [fh]
+    if sys.stderr is not None:  # under pythonw.exe there is no console stream
+        sh = logging.StreamHandler()
+        sh.setFormatter(fmt)
+        handlers.append(sh)
+    logging.basicConfig(level=logging.INFO, handlers=handlers)
+    try:
+        asyncio.run(run(args))
+    except BaseException:
+        # With no console attached a crash would otherwise vanish without a trace.
+        log.exception("collector exiting on unhandled exception")
+        raise
 
 
 if __name__ == "__main__":

@@ -4,12 +4,18 @@ Registers ONE Windows scheduled task that keeps collector.py running.
 collector.py loops forever on its own (one poll per minute). The task fires at logon and
 every 15 minutes; MultipleInstances=IgnoreNew means a new instance only starts if the
 previous one has exited or crashed, so this doubles as a watchdog. collector.py also has
-its own heartbeat guard against duplicate instances.
+its own heartbeat guard against duplicate instances, and restores its state from the
+database on start, so a restart loses at most the poll in flight.
 
-Runs as the current user while logged on (no stored password, no elevation). Read-only:
-public Kalshi endpoints only. Data lands in data\lip.db; the collector's own log is
-data\collector.log; anything printed before logging starts goes to data\collector_stderr.log.
-While the machine sleeps nothing is collected; missed periods are simply gaps in the data.
+Launches pythonw.exe DIRECTLY (no PowerShell wrapper, no console window). An earlier version
+wrapped python in `powershell -WindowStyle Hidden ... 2>&1 | Out-File` and the process was
+killed with exit code 0xC000013A (Ctrl+C / console close) about 5 minutes in, so the wrapper
+was removed. With no console, all logging goes to data\collector.log, including any crash.
+
+ExecutionTimeLimit is an explicit 7 days rather than "unlimited" (PT0S); the watchdog trigger
+restarts it after that. Runs as the current user while logged on (no stored password, no
+elevation). Read-only: public Kalshi endpoints only. While the machine sleeps nothing is
+collected; missed periods are gaps in the data.
 
 Safe to re-run (replaces the task). Remove with:
   Unregister-ScheduledTask -TaskName KalshiLIP-Collector -Confirm:$false
@@ -17,16 +23,12 @@ Safe to re-run (replaces the task). Remove with:
 
 $ErrorActionPreference = "Stop"
 $project = $PSScriptRoot
-$python  = Join-Path $project ".venv\Scripts\python.exe"
-$errlog  = Join-Path $project "data\collector_stderr.log"
+$pythonw = Join-Path $project ".venv\Scripts\pythonw.exe"
 
-if (-not (Test-Path $python)) { throw "venv python not found at $python" }
+if (-not (Test-Path $pythonw)) { throw "venv pythonw not found at $pythonw" }
 New-Item -ItemType Directory -Force -Path (Join-Path $project "data") | Out-Null
 
-# Out-File -Encoding utf8: `*>>` in Windows PowerShell 5.1 writes UTF-16.
-$inner  = "& '$python' collector.py 2>&1 | Out-File -FilePath '$errlog' -Append -Encoding utf8"
-$action = New-ScheduledTaskAction -Execute "powershell.exe" `
-    -Argument "-NoProfile -WindowStyle Hidden -Command `"$inner`"" -WorkingDirectory $project
+$action = New-ScheduledTaskAction -Execute $pythonw -Argument "collector.py" -WorkingDirectory $project
 
 $repeat  = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
     -RepetitionInterval (New-TimeSpan -Minutes 15) -RepetitionDuration (New-TimeSpan -Days 3650)
@@ -34,7 +36,7 @@ $atLogon = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable `
     -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
-    -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Seconds 0)
+    -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Days 7)
 
 Register-ScheduledTask -TaskName "KalshiLIP-Collector" -Force -Action $action `
     -Trigger @($repeat, $atLogon) -Settings $settings `
