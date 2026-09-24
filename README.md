@@ -19,6 +19,15 @@ python report.py               # reward-share estimate per market, latest snapsh
 powershell -File schedule_collector.ps1   # keep it running via Task Scheduler
 ```
 
+## Status (2026-09-24)
+
+Phase 1 is running: the collector was started on 2026-09-24 and is kept alive by a Windows
+scheduled task. Watching 300 non-sports markets (about $25k/day of reward pool between them).
+A steady-state cycle takes about 26 seconds and issues roughly 10 trade requests (volume gating
+skips markets where nothing traded); no rate-limit responses so far. The Phase 1 gate (at least
+7 days and 100 markets) has not been reached, and Phase 2 (the simulator) has not been started.
+`report.py` output is an upper bound, not a profit estimate.
+
 ## What was verified against the live API (2026-09-24)
 
 - **6,276** live liquidity programs across 539 series, not the ~480 the original handoff
