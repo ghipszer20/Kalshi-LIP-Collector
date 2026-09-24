@@ -1,0 +1,19 @@
+# Secrets — never commit (Phase 3 will need Kalshi API keys / RSA private key)
+.env
+.env.*
+*.pem
+*.key
+
+# Environments
+.venv/
+__pycache__/
+*.pyc
+
+# Collected data and logs — large, regenerable, never for git
+data/
+*.db
+*.db-wal
+*.db-shm
+*.parquet
+*.log
+*_scratch.json
